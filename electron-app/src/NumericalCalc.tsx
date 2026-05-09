@@ -201,7 +201,7 @@ export default function NumericalCalc() {
                 steps.push({ title: `Step ${iter + 1}`, detail: 'Newton Update', formula: 'x_new = x - f(x)/f\'(x)', result: `x = ${x1.toFixed(6)}` });
             }
 
-            if (Math.abs(x1 - x0) < tol || Math.abs(f0) < tol) { x0 = x1; break; }
+            if (Math.abs(x1 - x0) < tol || Math.abs(evaluate(fx, { x: x1 })) < tol) { x0 = x1; break; }
             x0 = x1; iter++;
           }
           log += `\n>>> Root found: ${x0.toFixed(6)} verified in ${iter} iterations.`;
@@ -215,13 +215,14 @@ export default function NumericalCalc() {
             let f0 = evaluate(fx, { x: x0 }), f1 = evaluate(fx, { x: x1 });
             if (Math.abs(f1 - f0) < 1e-12) throw new Error("Difference in f(x) is zero. Secant fails.");
             let x2 = x1 - f1 * (x1 - x0) / (f1 - f0);
-            log += `Iter ${iter + 1}: x2 = ${x2.toFixed(6)}, f(x2) = ${f1.toFixed(6)}\n`;
+            let f2 = evaluate(fx, { x: x2 });
+            log += `Iter ${iter + 1}: x2 = ${x2.toFixed(6)}, f(x2) = ${f2.toFixed(6)}\n`;
             
             if (iter < 5) {
                 steps.push({ title: `Step ${iter + 1}`, detail: 'Secant Update', formula: 'x2 = x1 - f1(x1-x0)/(f1-f0)', result: `x = ${x2.toFixed(6)}` });
             }
 
-            if (Math.abs(x2 - x1) < tol || Math.abs(evaluate(fx, {x: x2})) < tol) { x1 = x2; break; }
+            if (Math.abs(x2 - x1) < tol || Math.abs(f2) < tol) { x1 = x2; break; }
             x0 = x1; x1 = x2; iter++;
           }
           log += `\n>>> Root found: ${x1.toFixed(6)} verified in ${iter} iterations.`;
