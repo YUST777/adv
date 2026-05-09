@@ -361,6 +361,7 @@ export default function NumericalCalc() {
               }
             }
             xNew[i] = (B[i] - sum) / A[i][i];
+            if (!isFinite(xNew[i])) throw new Error(`Solution diverged at iteration ${iter + 1}. The matrix is not suitable for ${method === 'jacobi' ? 'Jacobi' : 'Gauss-Seidel'} iteration. Try rearranging rows for diagonal dominance.`);
             maxDiff = Math.max(maxDiff, Math.abs(xNew[i] - x[i]));
           }
           log += `Iter ${iter + 1}: x = [${xNew.map(v => v.toFixed(5)).join(', ')}]\n`;
@@ -627,23 +628,35 @@ export default function NumericalCalc() {
 
         if (method === 'derivTabForward') {
           log += `Derivatives at x0 = ${x[0]} (Newton Forward Formulas)\n`;
-          const d1 = (1/h) * (y[0][1] - 0.5*y[0][2] + (1/3)*y[0][3] - 0.25*y[0][4]);
-          const d2 = (1/(h*h)) * (y[0][2] - y[0][3] + (11/12)*y[0][4]);
+          let d1 = (1/h) * y[0][1];
+          if (n >= 3) d1 += (1/h) * (-0.5*y[0][2]);
+          if (n >= 4) d1 += (1/h) * ((1/3)*y[0][3]);
+          if (n >= 5) d1 += (1/h) * (-0.25*y[0][4]);
+          let d2 = 0;
+          if (n >= 3) d2 = (1/(h*h)) * y[0][2];
+          if (n >= 4) d2 += (1/(h*h)) * (-y[0][3]);
+          if (n >= 5) d2 += (1/(h*h)) * ((11/12)*y[0][4]);
           log += `f'(x0) ≈ ${d1.toFixed(6)}\nf''(x0) ≈ ${d2.toFixed(6)}\n`;
           steps.push({ title: 'Forward Derivs', detail: `At x0 = ${x[0]}`, result: `f'=${d1.toFixed(4)}, f''=${d2.toFixed(4)}` });
         } 
         else if (method === 'derivTabBackward') {
           log += `Derivatives at xn = ${x[n-1]} (Newton Backward Formulas)\n`;
-          const b1 = (1/h) * (y[n-2][1] + 0.5*y[n-3][2] + (1/3)*y[n-4][3]);
-          const b2 = (1/(h*h)) * (y[n-3][2] + y[n-4][3]);
+          let b1 = (1/h) * y[n-2][1];
+          if (n >= 4) b1 += (1/h) * (0.5*y[n-3][2]);
+          if (n >= 5) b1 += (1/h) * ((1/3)*y[n-4][3]);
+          let b2 = 0;
+          if (n >= 4) b2 = (1/(h*h)) * y[n-3][2];
+          if (n >= 5) b2 += (1/(h*h)) * y[n-4][3];
           log += `f'(xn) ≈ ${b1.toFixed(6)}\nf''(xn) ≈ ${b2.toFixed(6)}\n`;
           steps.push({ title: 'Backward Derivs', detail: `At xn = ${x[n-1]}`, result: `f'=${b1.toFixed(4)}, f''=${b2.toFixed(4)}` });
         }
         else {
           const mid = Math.floor(n/2);
           log += `Derivatives at x0 (center) = ${x[mid]} (Stirling Formulas)\n`;
-          const d1 = (1/h) * ((y[mid-1][1] + y[mid][1])/2 - (1/6)*((y[mid-2][3] + y[mid-1][3])/2));
-          const d2 = (1/(h*h)) * (y[mid-1][2] - (1/12)*y[mid-2][4]);
+          let d1 = (1/h) * ((y[mid-1][1] + y[mid][1])/2);
+          if (n >= 5) d1 -= (1/h) * ((1/6)*((y[mid-2][3] + y[mid-1][3])/2));
+          let d2 = (1/(h*h)) * y[mid-1][2];
+          if (n >= 5) d2 -= (1/(h*h)) * ((1/12)*y[mid-2][4]);
           log += `f'(x0) ≈ ${d1.toFixed(6)}\nf''(x0) ≈ ${d2.toFixed(6)}\n`;
           steps.push({ title: 'Central Derivs', detail: `At center = ${x[mid]}`, result: `f'=${d1.toFixed(4)}, f''=${d2.toFixed(4)}` });
         }
