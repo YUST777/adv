@@ -35,9 +35,39 @@ export default function NumericalCalc() {
   const [thomasRHS, setThomasRHS] = useState('5, 5, 5');
 
   // States for Interpolation
-  const [pointsText, setPointsText] = useState('1.0, 0.76519\n1.3, 0.62008\n1.6, 0.45540\n1.9, 0.28181\n2.2, 0.11036');
+  const [pointsGrid, setPointsGrid] = useState<string[][]>([
+    ['1.0', '0.76519'],
+    ['1.3', '0.62008'],
+    ['1.6', '0.45540'],
+    ['1.9', '0.28181'],
+    ['2.2', '0.11036'],
+  ]);
   const [interpX, setInterpX] = useState('1.5');
   const [resultText, setResultText] = useState<string | null>(null);
+
+  // Derive pointsText from grid for the calculate function
+  const pointsText = pointsGrid.map(row => row.join(', ')).join('\n');
+
+  const updatePointCell = (i: number, j: number, val: string) => {
+    const newGrid = [...pointsGrid];
+    newGrid[i] = [...newGrid[i]];
+    newGrid[i][j] = val;
+    setPointsGrid(newGrid);
+  };
+
+  const addPointRow = () => {
+    playClick();
+    const last = pointsGrid[pointsGrid.length - 1];
+    const lastX = parseFloat(last?.[0] || '0');
+    const h = pointsGrid.length >= 2 ? parseFloat(pointsGrid[1][0]) - parseFloat(pointsGrid[0][0]) : 0.3;
+    setPointsGrid([...pointsGrid, [(lastX + h).toFixed(1), '0']]);
+  };
+
+  const removePointRow = (i: number) => {
+    playClick();
+    if (pointsGrid.length <= 2) return;
+    setPointsGrid(pointsGrid.filter((_, idx) => idx !== i));
+  };
 
   const updateMatrixSize = (newSize: number) => {
     playClick();
@@ -63,14 +93,42 @@ export default function NumericalCalc() {
 
   /* Helper: Check diagonal dominance */
   const checkDiagonalDominance = (A: number[][]) => {
-    let dominant = true;
     const n = A.length;
     for (let i = 0; i < n; i++) {
         let sum = 0;
         for (let j = 0; j < n; j++) if (i !== j) sum += Math.abs(A[i][j]);
-        if (Math.abs(A[i][i]) < sum) dominant = false;
+        if (Math.abs(A[i][i]) <= sum) return false;
     }
-    return dominant;
+    return true;
+  };
+
+  /* Helper: Check if data points are equally spaced */
+  const checkEqualSpacing = (x: number[], tolerance = 0.001): { valid: boolean; h: number } => {
+    if (x.length < 2) return { valid: false, h: 0 };
+    const h = x[1] - x[0];
+    if (Math.abs(h) < 1e-12) return { valid: false, h: 0 };
+    for (let i = 2; i < x.length; i++) {
+      if (Math.abs((x[i] - x[i-1]) - h) > tolerance * Math.abs(h)) return { valid: false, h };
+    }
+    return { valid: true, h };
+  };
+
+  /* Helper: Check for duplicate x values */
+  const checkDuplicateX = (x: number[]): boolean => {
+    for (let i = 0; i < x.length; i++) {
+      for (let j = i + 1; j < x.length; j++) {
+        if (Math.abs(x[i] - x[j]) < 1e-12) return true;
+      }
+    }
+    return false;
+  };
+
+  /* Helper: Check if x values are sorted ascending */
+  const checkSorted = (x: number[]): boolean => {
+    for (let i = 1; i < x.length; i++) {
+      if (x[i] <= x[i-1]) return false;
+    }
+    return true;
   };
 
   const calculate = () => {
@@ -124,7 +182,7 @@ export default function NumericalCalc() {
             if (fa * fc < 0) { b = c; fb = fc; } else { a = c; fa = fc; }
             iter++;
           }
-          log += `\n🎯 Root found: ${c.toFixed(6)} verified in ${iter} iterations.`;
+          log += `\n>>> Root found: ${c.toFixed(6)} verified in ${iter} iterations.`;
           steps.push({ title: 'Final Result', detail: `Convergence achieved`, result: `Root ≈ ${c.toFixed(6)}`, badge: 'SUCCESS' });
         }
         else if (method === 'newtonRaphson') {
@@ -146,7 +204,7 @@ export default function NumericalCalc() {
             if (Math.abs(x1 - x0) < tol || Math.abs(f0) < tol) { x0 = x1; break; }
             x0 = x1; iter++;
           }
-          log += `\n🎯 Root found: ${x0.toFixed(6)} verified in ${iter} iterations.`;
+          log += `\n>>> Root found: ${x0.toFixed(6)} verified in ${iter} iterations.`;
           steps.push({ title: 'Final Result', detail: 'Target tolerance met', result: `Root ≈ ${x0.toFixed(6)}`, badge: 'SUCCESS' });
         }
         else if (method === 'secant') {
@@ -166,7 +224,7 @@ export default function NumericalCalc() {
             if (Math.abs(x2 - x1) < tol || Math.abs(evaluate(fx, {x: x2})) < tol) { x1 = x2; break; }
             x0 = x1; x1 = x2; iter++;
           }
-          log += `\n🎯 Root found: ${x1.toFixed(6)} verified in ${iter} iterations.`;
+          log += `\n>>> Root found: ${x1.toFixed(6)} verified in ${iter} iterations.`;
           steps.push({ title: 'Final Result', detail: 'Target tolerance met', result: `Root ≈ ${x1.toFixed(6)}`, badge: 'SUCCESS' });
         }
       }
@@ -183,10 +241,13 @@ export default function NumericalCalc() {
         steps.push({ title: 'Thomas Algorithm', detail: 'Solving Tridiagonal System', badge: 'Direct' });
 
         let y = new Array(n).fill(0), z = new Array(n).fill(0), x = new Array(n).fill(0);
+        if (Math.abs(b[0]) < 1e-12) throw new Error("Thomas Algorithm failed: main diagonal element b[0] is zero. Cannot proceed.");
         y[0] = b[0]; z[0] = d[0] / y[0];
         log += `Phase 1 (Forward Sweep):\n`;
         for (let i = 1; i < n; i++) {
+          if (Math.abs(y[i - 1]) < 1e-12) throw new Error(`Thomas Algorithm failed: zero pivot at y[${i-1}]. The system may be singular.`);
           y[i] = b[i] - (a[i] * c[i - 1]) / y[i - 1];
+          if (Math.abs(y[i]) < 1e-12) throw new Error(`Thomas Algorithm failed: zero pivot at y[${i}]. The system may be singular.`);
           z[i] = (d[i] - a[i] * z[i - 1]) / y[i];
           log += `  y[${i}]=${y[i].toFixed(4)}, z[${i}]=${z[i].toFixed(4)}\n`;
         }
@@ -199,7 +260,7 @@ export default function NumericalCalc() {
           log += `  x[${i}]=${x[i].toFixed(4)}\n`;
         }
         steps.push({ title: 'Back Substitution', detail: 'Calculating solution vector x from the end', result: `x[0] = ${x[0].toFixed(4)}` });
-        log += `\n🎯 Solution vector x: [ ${x.map(v => v.toFixed(4)).join(", ")} ]`;
+        log += `\n>>> Solution vector x: [ ${x.map(v => v.toFixed(4)).join(", ")} ]`;
         steps.push({ title: 'Final Solution', detail: 'Tridiagonal system solved', result: `x = [${x.map(v => v.toFixed(2)).join(', ')}]`, badge: 'SUCCESS' });
       }
       else if (method === 'doolittle' || method === 'crout') {
@@ -215,6 +276,7 @@ export default function NumericalCalc() {
               let sum = 0; for(let j=0; j<i; j++) sum += L[i][j]*U[j][k];
               U[i][k] = A[i][k] - sum;
             }
+            if (Math.abs(U[i][i]) < 1e-12) throw new Error(`Doolittle failed: zero pivot at U[${i}][${i}]. The matrix may be singular or need row swapping (pivoting).`);
             for(let k=i; k<n; k++) {
               if (i===k) L[i][i] = 1;
               else {
@@ -229,6 +291,7 @@ export default function NumericalCalc() {
               let sum = 0; for(let k=0; k<j; k++) sum += L[i][k]*U[k][j];
               L[i][j] = A[i][j] - sum;
             }
+            if (Math.abs(L[j][j]) < 1e-12) throw new Error(`Crout failed: zero pivot at L[${j}][${j}]. The matrix may be singular or need row swapping (pivoting).`);
             for(let i=j; i<n; i++) {
               if (i===j) U[i][i] = 1;
               else {
@@ -257,7 +320,7 @@ export default function NumericalCalc() {
             X[i] = (Y[i] - sum)/U[i][i];
         }
         steps.push({ title: 'Backward Substitution', detail: 'Solving UX = Y for X', result: `X = [${X.map(v => v.toFixed(2)).join(', ')}]` });
-        log += `\n🎯 Solution vector x: [ ${X.map(v => v.toFixed(6)).join(", ")} ]`;
+        log += `\n>>> Solution vector x: [ ${X.map(v => v.toFixed(6)).join(", ")} ]`;
         steps.push({ title: 'Final Solution', detail: 'System solved successfully', result: `x = [${X.map(v => v.toFixed(2)).join(', ')}]`, badge: 'SUCCESS' });
       }
 
@@ -268,12 +331,19 @@ export default function NumericalCalc() {
         
         steps.push({ title: 'Iterative Solver', detail: `Method: ${method === 'jacobi' ? 'Jacobi' : 'Gauss-Seidel'}`, badge: 'Iterative' });
 
+        // Check for zero diagonal elements first
+        for (let i = 0; i < n; i++) {
+          if (Math.abs(A[i][i]) < 1e-12) throw new Error(`Cannot solve: diagonal element A[${i+1}][${i+1}] is zero. Iterative methods require non-zero diagonal elements. Try rearranging your matrix rows.`);
+        }
+
         if (!checkDiagonalDominance(A)) {
-          log += "⚠️ WARNING: The matrix is NOT Strictly Diagonally Dominant. Convergence is not guaranteed! \n\n";
-          steps.push({ title: 'Convergence Check', detail: 'Matrix is not diagonally dominant', badge: 'WARNING' });
+          log += "[!] WARNING: The matrix is NOT Strictly Diagonally Dominant. Convergence is NOT guaranteed!\n";
+          log += "   For each row i, we need |a[i][i]| > sum of |a[i][j]| for j≠i.\n";
+          log += "   Consider rearranging rows to achieve diagonal dominance.\n\n";
+          steps.push({ title: 'Convergence Check', detail: 'Matrix is NOT diagonally dominant — convergence not guaranteed! Rearrange rows so largest values are on diagonal.', badge: 'WARNING' });
         } else {
-           log += "✅ Verification Passed: The matrix is Strictly Diagonally Dominant. Convergence is guaranteed.\n\n";
-           steps.push({ title: 'Convergence Check', detail: 'Matrix is diagonally dominant', badge: 'STABLE' });
+           log += "[OK] Verification Passed: The matrix is Strictly Diagonally Dominant. Convergence is guaranteed.\n\n";
+           steps.push({ title: 'Convergence Check', detail: 'Matrix is diagonally dominant ✓', badge: 'STABLE' });
         }
 
         let x = new Array(n).fill(0);
@@ -303,7 +373,7 @@ export default function NumericalCalc() {
           if (maxDiff < tol) break;
           iter++;
         }
-        log += `\n🎯 Converged in ${iter} iterations to: [ ${x.map(v => v.toFixed(5)).join(", ")} ]`;
+        log += `\n>>> Converged in ${iter} iterations to: [ ${x.map(v => v.toFixed(5)).join(", ")} ]`;
         steps.push({ title: 'Final Result', detail: `Converged in ${iter} iterations`, result: `x = [${x.map(v => v.toFixed(2)).join(', ')}]`, badge: 'SUCCESS' });
       }
 
@@ -312,13 +382,18 @@ export default function NumericalCalc() {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const tx = parseFloat(interpX);
         const n = pts.length;
+        if (n < 2) throw new Error("Need at least 2 data points.");
         let x = pts.map(p => p[0]);
         let y = Array.from({length: n}, () => new Array(n).fill(0));
         for(let i=0; i<n; i++) y[i][0] = pts[i][1];
         
+        if (!checkSorted(x)) throw new Error("Data points must be sorted in ascending order of x values for Newton Forward interpolation.");
+        const spacing = checkEqualSpacing(x);
+        if (!spacing.valid) throw new Error("Data points must be equally spaced for Newton Forward interpolation. Use Lagrange for unequal spacing.");
+
         steps.push({ title: "Newton's Forward", detail: `Interpolating at x = ${tx}`, badge: 'Interpolation' });
 
-        let h = Math.abs(x[1] - x[0]);
+        let h = spacing.h;
 
         // Build forward difference table
         for (let j = 1; j < n; j++) {
@@ -351,16 +426,19 @@ export default function NumericalCalc() {
             if (i < 4) steps.push({ title: `Polynomial Term ${i}`, detail: `Order ${i} contribution`, result: `+ ${term.toFixed(6)}` });
             sum += term;
         }
-        log += `\n🎯 Interpolated value f(${tx}) ≈ ${sum.toFixed(6)}`;
+        log += `\n>>> Interpolated value f(${tx}) ≈ ${sum.toFixed(6)}`;
         steps.push({ title: 'Result', detail: 'Final interpolated value', result: `f(${tx}) ≈ ${sum.toFixed(6)}`, badge: 'SUCCESS' });
       }
       else if (method === 'lagrange') {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const tx = parseFloat(interpX);
         const n = pts.length;
+        if (n < 2) throw new Error("Need at least 2 data points.");
         let x = pts.map(p => p[0]);
         let y = pts.map(p => p[1]);
         
+        if (checkDuplicateX(x)) throw new Error("Lagrange interpolation requires all x-values to be distinct. Found duplicate x-values in your data.");
+
         steps.push({ title: 'Lagrange Interpolation', detail: `Interpolating at x = ${tx}`, badge: 'Unequal Spacing' });
 
         let result = 0;
@@ -381,20 +459,25 @@ export default function NumericalCalc() {
             if (i < 4) steps.push({ title: `Basis L_${i}`, detail: `L_${i}(x) * y_${i}`, result: `Term = ${term.toFixed(6)}` });
             result += term;
         }
-        log += `\n🎯 Interpolated value f(${tx}) ≈ ${result.toFixed(6)}`;
+        log += `\n>>> Interpolated value f(${tx}) ≈ ${result.toFixed(6)}`;
         steps.push({ title: 'Result', detail: 'Sum of all basis terms', result: `f(${tx}) ≈ ${result.toFixed(6)}`, badge: 'SUCCESS' });
       }
       else if (method === 'newtonBackward') {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const tx = parseFloat(interpX);
         const n = pts.length;
+        if (n < 2) throw new Error("Need at least 2 data points.");
         let x = pts.map(p => p[0]);
         let y = Array.from({length: n}, () => new Array(n).fill(0));
         for(let i=0; i<n; i++) y[i][0] = pts[i][1];
         
+        if (!checkSorted(x)) throw new Error("Data points must be sorted in ascending order of x values for Newton Backward interpolation.");
+        const spacing = checkEqualSpacing(x);
+        if (!spacing.valid) throw new Error("Data points must be equally spaced for Newton Backward interpolation. Use Lagrange for unequal spacing.");
+
         steps.push({ title: "Newton's Backward", detail: `Interpolating at x = ${tx}`, badge: 'Interpolation' });
 
-        let h = Math.abs(x[1] - x[0]);
+        let h = spacing.h;
 
         // Build backward difference table
         for (let j = 1; j < n; j++) {
@@ -427,21 +510,27 @@ export default function NumericalCalc() {
             if (i < 4) steps.push({ title: `Polynomial Term ${i}`, detail: `Order ${i} contribution`, result: `+ ${term.toFixed(6)}` });
             sum += term;
         }
-        log += `\n🎯 Interpolated value f(${tx}) ≈ ${sum.toFixed(6)}`;
+        log += `\n>>> Interpolated value f(${tx}) ≈ ${sum.toFixed(6)}`;
         steps.push({ title: 'Result', detail: 'Final interpolated value', result: `f(${tx}) ≈ ${sum.toFixed(6)}`, badge: 'SUCCESS' });
       }
       else if (method === 'stirling') {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const tx = parseFloat(interpX);
         const n = pts.length;
-        steps.push({ title: "Stirling's Formula", detail: `Central interpolation at x = ${tx}`, badge: 'Central' });
-        if (n % 2 === 0) log += "⚠️ Note: Stirling works best with an odd number of points (center at x0).\n";
-        
+        if (n < 3) throw new Error("Stirling's formula needs at least 3 data points.");
         let x = pts.map(p => p[0]);
+
+        if (!checkSorted(x)) throw new Error("Data points must be sorted in ascending order for Stirling interpolation.");
+        const spacing = checkEqualSpacing(x);
+        if (!spacing.valid) throw new Error("Data points must be equally spaced for Stirling interpolation. Use Lagrange for unequal spacing.");
+        if (n % 2 === 0) throw new Error("Stirling's formula requires an odd number of data points (to have a center point).");
+
+        steps.push({ title: "Stirling's Formula", detail: `Central interpolation at x = ${tx}`, badge: 'Central' });
+        
         let y = Array.from({length: n}, () => new Array(n).fill(0));
         for(let i=0; i<n; i++) y[i][0] = pts[i][1];
         
-        const h = Math.abs(x[1] - x[0]);
+        const h = spacing.h;
         const mid = Math.floor(n / 2);
         const p = (tx - x[mid]) / h;
 
@@ -477,16 +566,19 @@ export default function NumericalCalc() {
             steps.push({ title: 'Term 3', detail: 'p(p^2-1)/3! * mean of 3rd diff', result: `+ ${t3.toFixed(6)}` });
         }
         
-        log += `\n🎯 Interpolated value f(${tx}) ≈ ${result.toFixed(6)}`;
+        log += `\n>>> Interpolated value f(${tx}) ≈ ${result.toFixed(6)}`;
         steps.push({ title: 'Result', detail: 'Stirling polynomial sum', result: `f(${tx}) ≈ ${result.toFixed(6)}`, badge: 'SUCCESS' });
       }
       else if (method === 'derivLagrange') {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const tx = parseFloat(interpX);
         const n = pts.length;
+        if (n < 2) throw new Error("Need at least 2 data points.");
         let x = pts.map(p => p[0]);
         let y = pts.map(p => p[1]);
         
+        if (checkDuplicateX(x)) throw new Error("Lagrange derivative requires all x-values to be distinct. Found duplicate x-values.");
+
         steps.push({ title: 'Lagrange Derivative', detail: `Differentiating at x = ${tx}`, badge: 'Unequal' });
 
         log += `Lagrange Derivatives at x = ${tx}\n`;
@@ -508,16 +600,21 @@ export default function NumericalCalc() {
             }
             d1 += liPrime * y[i];
         }
-        log += `\n🎯 f'(${tx}) ≈ ${d1.toFixed(6)}`;
+        log += `\n>>> f'(${tx}) ≈ ${d1.toFixed(6)}`;
         steps.push({ title: '1st Derivative', detail: 'Differentiated Lagrange basis sum', result: `f'(${tx}) ≈ ${d1.toFixed(6)}`, badge: 'SUCCESS' });
       }
       else if (['derivTabForward', 'derivTabBackward', 'derivTabStirling'].includes(method)) {
         const pts = pointsText.trim().split('\n').map(r => r.split(',').map(Number));
         const n = pts.length;
+        if (n < 3) throw new Error("Need at least 3 data points for tabulated differentiation.");
         let x = pts.map(p => p[0]);
         let y = Array.from({length: n}, () => new Array(n).fill(0));
         for(let i=0; i<n; i++) y[i][0] = pts[i][1];
-        const h = Math.abs(x[1] - x[0]);
+
+        if (!checkSorted(x)) throw new Error("Data points must be sorted in ascending order for tabulated differentiation.");
+        const spacing = checkEqualSpacing(x);
+        if (!spacing.valid) throw new Error("Data points must be equally spaced for tabulated differentiation. Use Lagrange derivative for unequal spacing.");
+        const h = spacing.h;
 
         steps.push({ title: 'Tabulated Differentiation', detail: 'Finding derivatives at a table point', badge: 'Discrete' });
 
@@ -558,7 +655,7 @@ export default function NumericalCalc() {
     } catch (e: any) {
       playError();
       setCalculationSteps([{ title: 'Error Occurred', detail: e.message, badge: 'FAILED' }]);
-      setResultText(`🚨 Error: ${e.message}\nPlease check your inputs and try again.`);
+      setResultText(`[ERROR] Error: ${e.message}\nPlease check your inputs and try again.`);
     }
   };
 
@@ -697,20 +794,47 @@ export default function NumericalCalc() {
         {(cCat === 'interpolation' || cCat === 'differentiation') && (
             <div className="space-y-3 animate-fade-in">
             <div>
-              <label className="block text-[11px] font-semibold text-grey-500 mb-1.5 uppercase tracking-wider flex justify-between">
-                  Data Points <span>(x, y)</span>
-              </label>
-              <textarea 
-                className="w-full bg-grey-950 border border-grey-800 rounded-lg px-3 py-2 text-xs text-grey-100 font-mono outline-none focus:border-grey-500 h-36" 
-                value={pointsText} 
-                onChange={e => setPointsText(e.target.value)} 
-                placeholder="x0, y0&#10;x1, y1"
-              />
-              <p className="text-[10px] text-grey-500 mt-1.5 leading-relaxed">1 point per line, comma separated.</p>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-semibold text-grey-500 uppercase tracking-wider">Data Points</label>
+                <div className="flex gap-1 items-center">
+                  <span className="text-[9px] text-grey-600 font-mono">{pointsGrid.length} pts</span>
+                  <button onClick={addPointRow} className="px-2 bg-grey-800 hover:bg-grey-700 text-grey-300 rounded text-xs font-bold leading-none py-1">+</button>
+                </div>
+              </div>
+              {/* Header */}
+              <div className="flex gap-1.5 mb-1">
+                <div className="flex-1 text-center text-[9px] font-bold text-grey-500 uppercase">x</div>
+                <div className="flex-1 text-center text-[9px] font-bold text-grey-500 uppercase">y</div>
+                <div className="w-6"></div>
+              </div>
+              {/* Grid rows */}
+              <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto custom-scrollbar pr-0.5">
+                {pointsGrid.map((row, i) => (
+                  <div key={i} className="flex gap-1 items-center">
+                    <input
+                      value={row[0]}
+                      onChange={(e) => updatePointCell(i, 0, e.target.value)}
+                      className="flex-1 h-6 text-center text-[11px] font-mono rounded bg-grey-950 border border-grey-800 text-grey-100 outline-none focus:border-grey-500 transition-colors"
+                      placeholder="x"
+                    />
+                    <input
+                      value={row[1]}
+                      onChange={(e) => updatePointCell(i, 1, e.target.value)}
+                      className="flex-1 h-6 text-center text-[11px] font-mono rounded bg-grey-950 border border-grey-800 text-grey-100 outline-none focus:border-grey-500 transition-colors"
+                      placeholder="y"
+                    />
+                    <button onClick={() => removePointRow(i)}
+                      className="w-5 h-6 flex items-center justify-center text-grey-600 hover:text-red-400 hover:bg-grey-800 rounded transition-colors"
+                      title="Remove row">
+                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 2L10 10M10 2L2 10"/></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="mt-2">
+            <div>
                 <label className="block text-[11px] font-semibold text-grey-500 mb-1.5 uppercase tracking-wider">
-                  Target x to Interpolate/Differentiate
+                  Target x
                 </label>
                 <input type="number" step="any" className="w-full bg-grey-950 border border-grey-800 rounded-lg px-3 py-2 text-sm text-grey-100 font-mono outline-none focus:border-grey-500" value={interpX} onChange={e => setInterpX(e.target.value)} />
             </div>

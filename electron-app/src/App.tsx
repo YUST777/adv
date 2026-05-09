@@ -475,7 +475,9 @@ export default function App() {
                       </>
                     ) : (
                       <div className="flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="text-7xl mb-3 select-none">🦆</div>
+                        <div className="text-7xl mb-3 select-none">
+                          <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-amber-500 mx-auto"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>
+                        </div>
                         <h3 className="text-xl font-serif text-grey-200 mb-2">Quack! Something's off...</h3>
                         <p className="text-grey-500 text-sm max-w-xs leading-relaxed">Check your inputs — <span className="text-grey-300">n</span> and <span className="text-grey-300">std dev</span> must be greater than zero.</p>
                       </div>

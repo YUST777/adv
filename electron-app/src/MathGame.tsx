@@ -141,7 +141,9 @@ export default function MathGame() {
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       {gameState === 'idle' && (
         <div className="text-center animate-fade-in max-w-md">
-          <div className="text-6xl mb-4">⚡</div>
+          <div className="text-6xl mb-4">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400 mx-auto"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
           <h2 className="text-3xl font-serif font-bold text-grey-50 mb-3">Speed Math</h2>
           <p className="text-grey-400 mb-8 text-sm leading-relaxed">
             Solve as many math problems as you can in 30 seconds. 
@@ -194,7 +196,7 @@ export default function MathGame() {
               <div className="text-[10px] uppercase tracking-widest text-grey-500">Time</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-mono font-bold text-grey-50">{streak}🔥</div>
+              <div className="text-2xl font-mono font-bold text-grey-50">{streak}<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="inline ml-1 text-orange-400"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z"/></svg></div>
               <div className="text-[10px] uppercase tracking-widest text-grey-500">Streak</div>
             </div>
           </div>
@@ -231,7 +233,9 @@ export default function MathGame() {
 
       {gameState === 'ended' && (
         <div className="text-center animate-fade-in max-w-md">
-          <div className="text-6xl mb-4">{score >= 200 ? '🏆' : score >= 100 ? '🎉' : '💪'}</div>
+          <div className="text-6xl mb-4">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`mx-auto ${score >= 200 ? 'text-amber-400' : score >= 100 ? 'text-emerald-400' : 'text-grey-300'}`}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+          </div>
           <h2 className="text-3xl font-serif font-bold text-grey-50 mb-2">Time's Up!</h2>
           
           <div className="grid grid-cols-3 gap-3 my-8 bg-grey-900 border border-grey-800 rounded-xl p-5">
@@ -244,7 +248,7 @@ export default function MathGame() {
               <div className="text-[10px] uppercase tracking-widest text-grey-500 mt-1">Answered</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-mono font-bold text-grey-50">{bestStreak}🔥</div>
+              <div className="text-3xl font-mono font-bold text-grey-50">{bestStreak}<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="inline ml-1 text-orange-400"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z"/></svg></div>
               <div className="text-[10px] uppercase tracking-widest text-grey-500 mt-1">Best Streak</div>
             </div>
           </div>
